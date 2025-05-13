@@ -1,44 +1,77 @@
-const express = require("express");
-const fs = require("fs");
-const cors = require("cors");
+const apiUrl = "http://localhost:3000/api/messages";
 
-const app = express();
-const PORT = 3000;
-const DATA_FILE = "messages.json";
+// Load posts from the server on page load
+document.addEventListener("DOMContentLoaded", loadPosts);
 
-app.use(cors());
-app.use(express.json());
+function loadPosts() {
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(posts => {
+            posts.forEach(addPostToFeed);
+        })
+        .catch(error => console.error("Error loading posts:", error));
+}
 
-// Load messages from file
-function loadMessages() {
-    try {
-        const data = fs.readFileSync(DATA_FILE);
-        return JSON.parse(data);
-    } catch (error) {
-        return [];
+function postMessage() {
+    const input = document.getElementById("postInput");
+    const imageInput = document.getElementById("imageInput");
+    const message = input.value.trim();
+    const timestamp = new Date().toISOString();
+
+    if (!message && !imageInput.files.length) return;
+
+    const post = {
+        username: "/user",
+        message: message,
+        timestamp: timestamp,
+    };
+
+    if (imageInput.files.length > 0) {
+        const file = imageInput.files[0];
+        const reader = new FileReader();
+
+        reader.onloadend = () => {
+            post.image = reader.result;
+            sendPost(post);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        sendPost(post);
     }
 }
 
-// Save messages to file
-function saveMessages(messages) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(messages, null, 2));
+function sendPost(post) {
+    fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(post),
+    })
+        .then(response => response.json())
+        .then(savedPost => {
+            addPostToFeed(savedPost);
+            document.getElementById("postInput").value = "";
+            document.getElementById("imageInput").value = "";
+        })
+        .catch(error => console.error("Error posting message:", error));
 }
 
-// Get all messages
-app.get("/api/messages", (req, res) => {
-    const messages = loadMessages();
-    res.json(messages);
-});
+function addPostToFeed(post) {
+    const feed = document.getElementById("feed");
 
-// Post a new message
-app.post("/api/messages", (req, res) => {
-    const newMessage = req.body;
-    const messages = loadMessages();
-    messages.push(newMessage);
-    saveMessages(messages);
-    res.json(newMessage);
-});
+    const postElement = document.createElement("li");
+    postElement.classList.add("post");
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+    let imageHtml = "";
+    if (post.image) {
+        imageHtml = `<div class="post-image"><img src="${post.image}" alt="Uploaded Image" /></div>`;
+    }
+
+    postElement.innerHTML = `
+        <div class="username">${post.username}</div>
+        <div class="message">${post.message}</div>
+        ${imageHtml}
+        <div class="timestamp">${new Date(post.timestamp).toLocaleString()}</div>
+    `;
+
+    feed.prepend(postElement); // newest at top
+}
