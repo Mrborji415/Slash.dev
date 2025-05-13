@@ -4,21 +4,185 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Slash</title>
-<link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #000;
+            color: #e7e9ea;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        header {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #1da1f2;
+        }
+
+        .input-area {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            background-color: #16181c;
+            color: #e7e9ea;
+            border: 1px solid #2f3336;
+            padding: 12px;
+            border-radius: 12px;
+            resize: none;
+            height: 80px;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        input[type="file"] {
+            margin-bottom: 10px;
+            color: #e7e9ea;
+        }
+
+        button {
+            background-color: #1da1f2;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #1991da;
+        }
+
+        .feed {
+            list-style: none;
+            padding: 0;
+        }
+
+        .post {
+            background-color: #16181c;
+            border: 1px solid #2f3336;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .username {
+            color: #8b98a5;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .timestamp {
+            font-size: 12px;
+            color: #555;
+            margin-top: 4px;
+        }
+
+        .message {
+            margin-top: 6px;
+            font-size: 16px;
+        }
+
+        .post img {
+            max-width: 100%;
+            margin-top: 10px;
+            border-radius: 8px;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header>Slash</header>
+<div class="container">
+    <header>Slash</header>
 
-        <div class="input-area">
-            <textarea id="postInput" placeholder="What's happening?"></textarea>
-            <button onclick="postMessage()">Post</button>
-        </div>
-
-        <ul id="feed" class="feed"></ul>
+    <div class="input-area">
+        <textarea id="postInput" placeholder="What's happening?"></textarea>
+        <input type="file" id="imageInput" accept="image/*">
+        <button onclick="postMessage()">Post</button>
     </div>
 
-<script src="js/script.js"></script>
+    <ul id="feed" class="feed"></ul>
+</div>
 
+<script>
+    const apiUrl = "http://localhost:3000/api/messages";
+
+    document.addEventListener("DOMContentLoaded", loadPosts);
+
+    function loadPosts() {
+        fetch(apiUrl)
+            .then(response => response.json())
+            .then(posts => {
+                posts.forEach(addPostToFeed);
+            })
+            .catch(error => console.error("Error loading posts:", error));
+    }
+
+    function postMessage() {
+        const input = document.getElementById("postInput");
+        const imageInput = document.getElementById("imageInput");
+        const message = input.value.trim();
+        const imageFile = imageInput.files[0];
+
+        if (!message && !imageFile) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const post = {
+                username: "/user",
+                message: message,
+                timestamp: new Date().toLocaleString(),
+                image: reader.result || null
+            };
+
+            fetch(apiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(post),
+            })
+                .then(response => response.json())
+                .then(savedPost => {
+                    addPostToFeed(savedPost);
+                    input.value = "";
+                    imageInput.value = "";
+                })
+                .catch(error => console.error("Error posting message:", error));
+        };
+
+        if (imageFile) {
+            reader.readAsDataURL(imageFile);
+        } else {
+            reader.onloadend();
+        }
+    }
+
+    function addPostToFeed(post) {
+        const feed = document.getElementById("feed");
+        const postElement = document.createElement("li");
+        postElement.classList.add("post");
+
+        postElement.innerHTML = `
+            <span class="username">${post.username}</span>
+            <div class="timestamp">${post.timestamp || ''}</div>
+            <div class="message">${post.message}</div>
+            ${post.image ? `<img src="${post.image}" alt="User upload">` : ''}
+        `;
+
+        feed.prepend(postElement);
+    }
+</script>
 </body>
 </html>
